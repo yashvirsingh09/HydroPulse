@@ -1,0 +1,31 @@
+{
+  "name": "@hydropulse/core-dsp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "High-Performance TypeScript DSP Engine: Korteweg Solver, Butterfly FFT, STFT Spectrogram, and GCC-PHAT TDOA Localization",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "pretest": "tsc",
+    "test": "node --test dist/tests/dsp.test.js dist/tests/spectrogram.test.js dist/tests/benchmark.test.js",
+    "test:bench": "node --test dist/tests/benchmark.test.js"
+  },
+  "keywords": [
+    "dsp",
+    "acoustic",
+    "leak-detection",
+    "gcc-phat",
+    "fft",
+    "stft",
+    "spectrogram",
+    "korteweg",
+    "ece"
+  ],
+  "author": "HydroPulse Systems",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.8.0"
+  }
+}

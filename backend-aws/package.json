@@ -1,0 +1,23 @@
+{
+  "name": "@hydropulse/backend-aws",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AWS Serverless Lambda & Closed-Loop Actuation Services for HydroPulse",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "node --watch-path=src dist/server.js",
+    "test:integration": "node dist/testIntegration.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.758.0",
+    "@aws-sdk/client-sns": "^3.758.0",
+    "@aws-sdk/lib-dynamodb": "^3.758.0",
+    "@hydropulse/core-dsp": "file:../core-dsp"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.8.0"
+  }
+}

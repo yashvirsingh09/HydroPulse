@@ -1,0 +1,17 @@
+{
+  "name": "hydropulse-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HydroPulse Monorepo: Embedded Firmware, TypeScript DSP, AWS Backend, and SCADA Web Console",
+  "scripts": {
+    "test:dsp": "npm test --prefix core-dsp",
+    "test:backend": "node backend-aws/dist/testIntegration.js",
+    "test:e2e": "node tests/e2e/run_e2e_tests.mjs",
+    "build:dsp": "npm run build --prefix core-dsp",
+    "build:backend": "npm run build --prefix backend-aws",
+    "build:web": "npm run build --prefix web-console",
+    "build:all": "npm run build:dsp && npm run build:backend && npm run build:web",
+    "start:backend": "node backend-aws/dist/server.js",
+    "start:web": "npm run preview --prefix web-console"
+  }
+}

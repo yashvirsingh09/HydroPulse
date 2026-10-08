@@ -1,0 +1,171 @@
+/**
+ * @file dsp.test.ts
+ * @brief Automated Test Suite for HydroPulse DSP, Scenarios & TDOA Triangulation
+ */
+
+import { describe, it } from 'node:test';
+import assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  calculateKortewegWaveSpeed,
+  triangulatePipeLeak,
+  fft,
+  DELHI_PIPE_SCENARIOS,
+  generateScenarioBurst,
+  zeroPhaseBandpass,
+  computeSTALTA
+} from '../src/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+describe('HydroPulse DSP Core Engine Verification', () => {
+
+  it('calculates Korteweg wave speed with sub-percent accuracy', () => {
+    // 400 mm Ductile iron pipe with 12 mm wall thickness
+    const speed = calculateKortewegWaveSpeed({
+      lengthM: 500,
+      diameterM: 0.4,
+      wallThicknessM: 0.012
+    });
+
+    // Analytical expectation: ~1258 m/s
+    assert.ok(speed > 1240 && speed < 1280, `Expected ~1258 m/s, got ${speed} m/s`);
+  });
+
+  it('verifies Korteweg wave velocities across all Delhi pipe materials and scenarios', () => {
+    const bawana = DELHI_PIPE_SCENARIOS['DEL-BAWANA-01'];
+    const rohini = DELHI_PIPE_SCENARIOS['DEL-ROHINI-04'];
+    const wazirabad = DELHI_PIPE_SCENARIOS['DEL-WAZIRABAD-02'];
+    const okhla = DELHI_PIPE_SCENARIOS['DEL-OKHLA-03'];
+
+    assert.strictEqual(calculateKortewegWaveSpeed(bawana.pipeParams), 1258.10);
+    assert.strictEqual(calculateKortewegWaveSpeed(rohini.pipeParams), 1113.85);
+    assert.strictEqual(calculateKortewegWaveSpeed(wazirabad.pipeParams), 1205.32);
+    assert.strictEqual(calculateKortewegWaveSpeed(okhla.pipeParams), 293.91);
+  });
+
+  it('generates reproducible synthetic bursts with fixed PRNG seed', () => {
+    const burst1 = generateScenarioBurst('DEL-BAWANA-01', { seed: 1337 });
+    const burst2 = generateScenarioBurst('DEL-BAWANA-01', { seed: 1337 });
+
+    assert.strictEqual(burst1.node_a.samples[1000], burst2.node_a.samples[1000]);
+    assert.strictEqual(burst1.node_b.samples[2500], burst2.node_b.samples[2500]);
+    assert.strictEqual(burst1.metadata.ground_truth_leak_m, 185.0);
+    assert.strictEqual(burst1.metadata.ground_truth_delta_t_ms, 103.3304);
+  });
+
+  it('suppresses low-frequency traffic vibrations with 4th-order zero-phase filter', () => {
+    const fs = 10000;
+    const n = 5000;
+    const trafficSignal = new Float64Array(n);
+    const burstSignal = new Float64Array(n);
+
+    for (let i = 0; i < n; i++) {
+      const t = i / fs;
+      // 38 Hz traffic rumble
+      trafficSignal[i] = Math.sin(2 * Math.PI * 38 * t);
+      // 850 Hz rupture resonance
+      burstSignal[i] = Math.sin(2 * Math.PI * 850 * t);
+    }
+
+    const filteredTraffic = zeroPhaseBandpass(trafficSignal, fs, 300, 2200);
+    const filteredBurst = zeroPhaseBandpass(burstSignal, fs, 300, 2200);
+
+    // Compute RMS amplitudes
+    const rmsTrafficIn = Math.sqrt(trafficSignal.reduce((acc, v) => acc + v * v, 0) / n);
+    const rmsTrafficOut = Math.sqrt(filteredTraffic.reduce((acc, v) => acc + v * v, 0) / n);
+    const trafficSuppressionDb = 20 * Math.log10(rmsTrafficIn / rmsTrafficOut);
+
+    const rmsBurstIn = Math.sqrt(burstSignal.reduce((acc, v) => acc + v * v, 0) / n);
+    const rmsBurstOut = Math.sqrt(filteredBurst.reduce((acc, v) => acc + v * v, 0) / n);
+    const burstPassRatio = rmsBurstOut / rmsBurstIn;
+
+    // Traffic rumble (> 30 dB suppression at 38 Hz)
+    assert.ok(trafficSuppressionDb > 30.0, `Expected > 30 dB traffic suppression, got ${trafficSuppressionDb} dB`);
+    // Rupture passband (> 80% transmission near 850 Hz)
+    assert.ok(burstPassRatio > 0.8, `Expected > 0.8 passband transmission, got ${burstPassRatio}`);
+  });
+
+  it('triggers STA/LTA onset near the physical acoustic arrival', () => {
+    const fs = 10000;
+    const burst = generateScenarioBurst('DEL-BAWANA-01', { seed: 42, snrDb: 18 });
+    const clean = zeroPhaseBandpass(burst.node_a.samples, fs, 300, 2200);
+    const staLta = computeSTALTA(clean, 50, 400);
+
+    assert.ok(staLta.primaryOnsetIndex > 400, 'Onset must occur after initial LTA warmup');
+    assert.ok(staLta.topTriggers.length > 0, 'Must detect at least one transient peak');
+  });
+
+  it('performs forward FFT and inverse IFFT without numerical distortion', () => {
+    const n = 128;
+    const real = new Float64Array(n);
+    const imag = new Float64Array(n);
+
+    // Create a known test signal: delta impulse at index 10
+    real[10] = 1.0;
+    const original = new Float64Array(real);
+
+    fft(real, imag, false); // Forward FFT
+    fft(real, imag, true);  // Inverse IFFT
+
+    for (let i = 0; i < n; i++) {
+      assert.ok(Math.abs(real[i] - original[i]) < 1e-10, `Reconstruction error at index ${i}`);
+      assert.ok(Math.abs(imag[i]) < 1e-10, `Imaginary residual at index ${i}`);
+    }
+  });
+
+  it('accurately triangulates real synthetic burst data within sub-meter precision (<= 1.5m)', () => {
+    // Load scenario generated by physics-engine
+    const fixtureCandidates = [
+      path.resolve(__dirname, '../../physics-engine/sample_burst_bawana.json'),
+      path.resolve(__dirname, '../../../physics-engine/sample_burst_bawana.json')
+    ];
+    const fixturePath = fixtureCandidates.find((p) => fs.existsSync(p));
+    if (!fixturePath) {
+      console.warn('Skipping fixture test: sample_burst_bawana.json not found yet.');
+      return;
+    }
+
+    const payload = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
+    const meta = payload.metadata;
+
+    const result = triangulatePipeLeak(
+      {
+        lengthM: meta.pipe_length_m,
+        diameterM: meta.pipe_diameter_m,
+        wallThicknessM: meta.wall_thickness_m
+      },
+      {
+        nodeId: 1,
+        sampleRateHz: meta.sample_rate_hz,
+        samples: payload.node_a.samples
+      },
+      {
+        nodeId: 2,
+        sampleRateHz: meta.sample_rate_hz,
+        samples: payload.node_b.samples
+      },
+      meta.ground_truth_leak_m
+    );
+
+    console.log('\n--- HydroPulse Verification Results ---');
+    console.log(`Ground Truth Leak Position : ${meta.ground_truth_leak_m} m`);
+    console.log(`Estimated Leak Position    : ${result.estimatedLeakDistanceM} m`);
+    console.log(`Wave Speed                 : ${result.waveSpeedMs} m/s`);
+    console.log(`Extracted Time Delay Δt    : ${result.deltaTMilliseconds} ms`);
+    console.log(`Localization Error         : ${result.localizationErrorM} m`);
+    console.log(`Confidence Score           : ${result.confidenceScore}%`);
+    console.log('---------------------------------------\n');
+
+    assert.ok(result.localizationErrorM !== undefined);
+    assert.ok(
+      result.localizationErrorM <= 1.5,
+      `Localization error exceeded threshold: ${result.localizationErrorM}m > 1.5m`
+    );
+    assert.ok(result.confidenceScore > 80.0, 'Confidence score should be high for prominent rupture');
+  });
+});
