@@ -26,6 +26,8 @@ describe('HydroPulse 80-Run Multi-Scenario Acoustic Benchmark Suite', () => {
     const allErrors: number[] = [];
     let totalRuns = 0;
     let passedRuns = 0;
+    let sixDbTotalRuns = 0;
+    let sixDbPassedRuns = 0;
 
     console.log('\n========================================================================================================');
     console.log('              HYDROPULSE AUTONOMOUS ACOUSTIC LOCALIZATION: 80-RUN BENCHMARK SUITE                       ');
@@ -64,8 +66,10 @@ describe('HydroPulse 80-Run Multi-Scenario Acoustic Benchmark Suite', () => {
           conditionTimes.push(elapsedMs);
 
           totalRuns++;
+          if (snr === 6) sixDbTotalRuns++;
           if (err <= 1.5) {
             passedRuns++;
+            if (snr === 6) sixDbPassedRuns++;
           }
         }
 
@@ -113,15 +117,19 @@ describe('HydroPulse 80-Run Multi-Scenario Acoustic Benchmark Suite', () => {
     const overallMax = Math.max(...allErrors);
     const overallPassPct = (passedRuns / totalRuns) * 100.0;
 
+    const sixDbPassPct = sixDbTotalRuns > 0 ? (sixDbPassedRuns / sixDbTotalRuns) * 100.0 : 0.0;
+
     console.log(`\nOVERALL BENCHMARK ACCURACY SUMMARY:`);
     console.log(`- Total Runs Completed      : ${totalRuns} / 80`);
     console.log(`- Runs Passed (<= 1.5m)     : ${passedRuns} / 80 (${overallPassPct.toFixed(1)}%)`);
+    console.log(`- 6 dB SNR Runs (<= 1.5m)   : ${sixDbPassedRuns} / ${sixDbTotalRuns} (${sixDbPassPct.toFixed(1)}%)`);
     console.log(`- Overall Mean Error        : ${overallMean.toFixed(3)} m`);
     console.log(`- Overall Maximum Error     : ${overallMax.toFixed(3)} m`);
     console.log(`========================================================================================================\n`);
 
     assert.strictEqual(totalRuns, 80, 'Must complete exactly 80 benchmark runs');
-    assert.ok(passedRuns >= 70, `At least 85% of benchmark runs (>= 70/80) must achieve <= 1.5m error, got ${passedRuns}`);
-    assert.ok(overallPassPct >= 85, `Overall sub-meter pass rate must exceed 85%, got ${overallPassPct.toFixed(1)}%`);
+    assert.ok(passedRuns >= 72, `At least 90% of benchmark runs (>= 72/80) must achieve <= 1.5m error, got ${passedRuns}`);
+    assert.ok(overallPassPct >= 90.0, `Overall sub-meter pass rate must exceed 90%, got ${overallPassPct.toFixed(1)}%`);
+    assert.ok(sixDbPassedRuns >= 18, `Severe noise (6 dB SNR) pass rate must achieve >= 90% (>= 18/20), got ${sixDbPassedRuns}/${sixDbTotalRuns}`);
   });
 });

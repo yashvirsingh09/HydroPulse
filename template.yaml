@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  HydroPulse - Autonomous Acoustic Water Hammer & Pipe Rupture Triangulation SCADA
+  Serverless Edge Ingestion, Triangulation Engine, and Automated Valve Mitigation.
+  100% AWS Free Tier Compliant.
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 512
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        NODE_ENV: production
+        DYNAMODB_TABLE: !Ref IncidentsTable
+        SNS_TOPIC_ARN: !Ref AlertsTopic
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+  HttpApi:
+    CorsConfiguration:
+      AllowOrigins:
+        - '*'
+      AllowHeaders:
+        - Content-Type
+        - Authorization
+        - X-Amz-Date
+        - X-Api-Key
+      AllowMethods:
+        - GET
+        - POST
+        - OPTIONS
+      MaxAge: 600
+
+Resources:
+  # =========================================================================
+  # Amazon DynamoDB: Serverless Incident Registry & Pipe State
+  # PAY_PER_REQUEST on-demand billing ensures $0.00 idle cost (100% Free Tier)
+  # =========================================================================
+  IncidentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: HydroPulse-Incidents
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: incidentId
+          AttributeType: S
+        - AttributeName: pipeId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: incidentId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: PipeIncidentsIndex
+          KeySchema:
+            - AttributeName: pipeId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: HydroPulse
+        - Key: Environment
+          Value: Production
+
+  # =========================================================================
+  # Amazon SNS Topic: Emergency Rupture & Water Hammer Alerts
+  # Dispatches instantaneous SMS / email / webhook work orders to crews
+  # =========================================================================
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: hydropulse-pipe-rupture-alerts
+      DisplayName: HydroPulse Emergency Water Rupture Alerts
+      FifoTopic: false
+      Tags:
+        - Key: Project
+          Value: HydroPulse
+
+  # =========================================================================
+  # Amazon API Gateway (HTTP API v2): Low Latency & Native CORS
+  # =========================================================================
+  HydroPulseApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: hydropulse-scada-api
+      Description: HTTP API Gateway for HydroPulse Telemetry Ingestion and SCADA Control
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        MaxAge: 600
+
+  # =========================================================================
+  # AWS Lambda: ARM64 Graviton2 Ingestion & DSP Triangulation Function
+  # =========================================================================
+  IngestBurstFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: hydropulse-burst-ingest
+      Description: Ingests 10 kHz acoustic telemetry, pinpoints rupture via GCC-PHAT, throttles PRV
+      CodeUri: backend-aws/
+      Handler: dist/handlers/ingestBurst.lambdaHandler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IncidentsTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt AlertsTopic.TopicName
+      Events:
+        IngestBurstEvent:
+          Type: HttpApi
+          Properties:
+            Path: /api/burst/ingest
+            Method: post
+            ApiId: !Ref HydroPulseApi
+        GetPipesEvent:
+          Type: HttpApi
+          Properties:
+            Path: /api/pipes
+            Method: get
+            ApiId: !Ref HydroPulseApi
+        GetIncidentsEvent:
+          Type: HttpApi
+          Properties:
+            Path: /api/incidents
+            Method: get
+            ApiId: !Ref HydroPulseApi
+        ActuateValveEvent:
+          Type: HttpApi
+          Properties:
+            Path: /api/valves/actuate
+            Method: post
+            ApiId: !Ref HydroPulseApi
+      Tags:
+        Project: HydroPulse
+        Runtime: Node20-ARM64
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTP API Gateway base URL for SCADA console integration
+    Value: !Sub 'https://${HydroPulseApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Export:
+      Name: HydroPulse-ApiEndpoint
+
+  IngestBurstFunctionArn:
+    Description: ARN of the ARM64 DSP Triangulation Lambda Function
+    Value: !GetAtt IngestBurstFunction.Arn
+    Export:
+      Name: HydroPulse-FunctionArn
+
+  IncidentsTableArn:
+    Description: ARN of the DynamoDB Incidents Table
+    Value: !GetAtt IncidentsTable.Arn
+    Export:
+      Name: HydroPulse-TableArn
+
+  AlertsTopicArn:
+    Description: ARN of the SNS Rupture Alert Topic
+    Value: !Ref AlertsTopic
+    Export:
+      Name: HydroPulse-TopicArn

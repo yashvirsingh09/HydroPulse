@@ -19,15 +19,24 @@ export function triangulatePipeLeak(
   const L = params.lengthM ?? (params as any).lengthMeters ?? 500;
   const fs = nodeABurst.sampleRateHz ?? (nodeABurst as any).sampleRate ?? (nodeABurst as any).sample_rate_hz ?? 10000;
 
-  const minHz = options?.passbandMinHz ?? 450;
-  const maxHz = options?.passbandMaxHz ?? 1500;
+  const minHz = options?.passbandMinHz ?? 770;
+  const maxHz = options?.passbandMaxHz ?? 930;
+  const taperHz = options?.taperWidthHz ?? 70;
+  const bandLimited = options?.bandLimited ?? true;
   const useGating = options?.useAdaptiveGating ?? false;
 
-  const cleanA = nodeABurst.samples;
-  const cleanB = nodeBBurst.samples;
+  // Acoustic resonance pre-filtering: 4th-order zero-phase Butterworth bandpass
+  let cleanA: Float64Array | number[] = nodeABurst.samples;
+  let cleanB: Float64Array | number[] = nodeBBurst.samples;
+  if (nodeABurst.samples && nodeABurst.samples.length >= 16) {
+    cleanA = zeroPhaseBandpass(nodeABurst.samples, fs, minHz, maxHz);
+  }
+  if (nodeBBurst.samples && nodeBBurst.samples.length >= 16) {
+    cleanB = zeroPhaseBandpass(nodeBBurst.samples, fs, minHz, maxHz);
+  }
 
-  // Maximum feasible physical acoustic transit delay across pipe length L
-  const maxFeasibleDelaySec = (L / v_s) * 1.05;
+  // Maximum feasible physical acoustic transit delay across pipe length L: |Δt| <= L / v_s
+  const maxFeasibleDelaySec = L / v_s;
 
   let deltaTSeconds = 0.0;
   let deltaTMilliseconds = 0.0;
@@ -56,7 +65,7 @@ export function triangulatePipeLeak(
       gated.gatedB,
       fs,
       maxSegmentDelaySec,
-      { minFreqHz: minHz, maxFreqHz: maxHz, bandLimited: true }
+      { minFreqHz: minHz, maxFreqHz: maxHz, bandLimited: true, taperWidthHz: taperHz }
     );
 
     // Map gated segment lag back to original full buffer delay:
@@ -71,7 +80,8 @@ export function triangulatePipeLeak(
       const gccFull = computeGCCPhat(cleanA, cleanB, fs, maxFeasibleDelaySec, {
         minFreqHz: minHz,
         maxFreqHz: maxHz,
-        bandLimited: true
+        bandLimited: bandLimited,
+        taperWidthHz: taperHz
       });
       deltaTSeconds = gccFull.deltaTSeconds;
       deltaTMilliseconds = gccFull.deltaTMilliseconds;
@@ -82,19 +92,46 @@ export function triangulatePipeLeak(
     const gcc = computeGCCPhat(cleanA, cleanB, fs, maxFeasibleDelaySec, {
       minFreqHz: minHz,
       maxFreqHz: maxHz,
-      bandLimited: options?.bandLimited ?? false
+      bandLimited: bandLimited,
+      taperWidthHz: taperHz
     });
     deltaTSeconds = gcc.deltaTSeconds;
     deltaTMilliseconds = gcc.deltaTMilliseconds;
     confidenceScore = gcc.confidenceScore;
+
+    // Carrier cycle verification: resolve narrowband carrier sidelobe ambiguity
+    // when a broadband acoustic shockwave is prominent in raw sensors
+    if (bandLimited && nodeABurst.samples && nodeBBurst.samples && nodeABurst.samples.length >= 16) {
+      const gccBroad = computeGCCPhat(nodeABurst.samples, nodeBBurst.samples, fs, maxFeasibleDelaySec, {
+        bandLimited: false
+      });
+      if (gccBroad.peakValue > 0.038 && gcc.peakValue < 0.015) {
+        const fc = (minHz + maxHz) / 2.0; // resonant center frequency
+        const T = 1.0 / fc;
+        const cycleDiff = (gcc.deltaTSeconds - gccBroad.deltaTSeconds) / T;
+        const k = Math.round(cycleDiff);
+        if (Math.abs(cycleDiff - k) < 0.35 && Math.abs(k) >= 2) {
+          deltaTSeconds = gcc.deltaTSeconds - k * T;
+          deltaTMilliseconds = deltaTSeconds * 1000.0;
+        }
+      }
+    }
   }
+
+  // Strict physical travel-time boundary enforcement: |Δt| <= L / v_s
+  if (deltaTSeconds > maxFeasibleDelaySec) {
+    deltaTSeconds = maxFeasibleDelaySec;
+  } else if (deltaTSeconds < -maxFeasibleDelaySec) {
+    deltaTSeconds = -maxFeasibleDelaySec;
+  }
+  deltaTMilliseconds = deltaTSeconds * 1000.0;
 
   // Rupture Triangulation formula:
   // If burst reaches Node A first (leak closer to Node A): t1 < t2 => delta_t = t2 - t1 > 0
   // x_from_A = (L - v_s * delta_t) / 2
   let estimatedLeakDistanceM = (L - v_s * deltaTSeconds) / 2.0;
 
-  // Constrain within physical pipe bounds
+  // Constrain within physical pipe bounds [0, L]
   estimatedLeakDistanceM = Math.max(0.0, Math.min(L, estimatedLeakDistanceM));
   const distanceFromNodeBM = L - estimatedLeakDistanceM;
 

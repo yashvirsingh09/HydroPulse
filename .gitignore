@@ -11,3 +11,32 @@ build/
 # OS files
 Thumbs.db
 .DS_Store
+
+# Python bytecode & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# AWS SAM & Serverless build artifacts
+.aws-sam/
+samconfig.toml.local
+
+# Temporary / Scratch test fixtures & data
+temp_*.json
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Coverage & testing caches
+coverage/
+*.lcov
+.nyc_output/
+
+# Bundler & tool caches
+.vite/
+.eslintcache
+*.tsbuildinfo

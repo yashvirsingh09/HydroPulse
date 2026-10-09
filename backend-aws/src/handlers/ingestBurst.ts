@@ -6,6 +6,7 @@
 import { triangulatePipeLeak, computeGCCPhat } from '@hydropulse/core-dsp';
 import { DynamoService, IncidentRecord } from '../services/dynamoService.js';
 import { AlertService } from '../services/alertService.js';
+import { ActuatorService } from '../services/actuatorService.js';
 
 export interface BurstIngestPayload {
   pipeId: string;
@@ -51,17 +52,13 @@ export async function handleIngestBurst(payload: BurstIngestPayload) {
     groundTruth
   );
 
-  // Compute GPS coordinates along the linear pipe vector
+  // Compute GPS coordinates along linear pipe vector
   const fraction = Math.max(0, Math.min(1, result.estimatedLeakDistanceM / pipe.lengthM));
   const leakLat = pipe.coordinates.nodeA[0] + fraction * (pipe.coordinates.nodeB[0] - pipe.coordinates.nodeA[0]);
   const leakLng = pipe.coordinates.nodeA[1] + fraction * (pipe.coordinates.nodeB[1] - pipe.coordinates.nodeA[1]);
 
-  // Closed-loop mitigation: If confidence > 75%, trigger emergency PRV throttle
-  let actionTaken = 'MONITORING_ONLY';
-  if (result.confidenceScore >= 75.0) {
-    await DynamoService.updateValveStatus(pipe.pipeId, 'THROTTLED_50');
-    actionTaken = `AUTO_THROTTLE_PRV: ${pipe.prvValveId} reduced to 50% flow to mitigate blowout`;
-  }
+  // Autonomous closed-loop valve mitigation
+  const mitigation = await ActuatorService.executeMitigation(pipe, result.confidenceScore);
 
   const incident: IncidentRecord = {
     incidentId: `INC-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -75,14 +72,14 @@ export async function handleIngestBurst(payload: BurstIngestPayload) {
     waveSpeedMs: result.waveSpeedMs,
     deltaTMs: result.deltaTMilliseconds,
     prvValveId: pipe.prvValveId,
-    actionTaken
+    actionTaken: mitigation.actionTaken
   };
 
   // Record incident and dispatch SNS alert
   await DynamoService.recordIncident(incident);
   await AlertService.dispatchIncidentAlert(incident);
 
-  // Also extract compact correlation curve for the UI
+  // Compact correlation curve for SCADA UI visualizer
   const gcc = computeGCCPhat(payload.node_a.samples, payload.node_b.samples, sampleRateHz);
 
   return {
@@ -90,6 +87,7 @@ export async function handleIngestBurst(payload: BurstIngestPayload) {
     incident,
     triangulation: result,
     pipeStatus: await DynamoService.getPipe(pipe.pipeId),
+    actuation: mitigation,
     visualization: {
       correlationCurve: gcc.correlationCurve,
       lagIndices: gcc.lagIndices,
@@ -98,3 +96,41 @@ export async function handleIngestBurst(payload: BurstIngestPayload) {
     }
   };
 }
+
+/**
+ * AWS Lambda HTTP API Proxy Entrypoint
+ */
+export async function lambdaHandler(event: any) {
+  try {
+    let payload: BurstIngestPayload;
+    if (event.body) {
+      payload = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
+    } else {
+      payload = event;
+    }
+
+    const result = await handleIngestBurst(payload);
+
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+      },
+      body: JSON.stringify(result)
+    };
+  } catch (err: any) {
+    return {
+      statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({ success: false, error: err.message })
+    };
+  }
+}
+
+export const handler = lambdaHandler;

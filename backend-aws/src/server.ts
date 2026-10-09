@@ -7,6 +7,7 @@
 import http from 'node:http';
 import { handleIngestBurst } from './handlers/ingestBurst.js';
 import { DynamoService } from './services/dynamoService.js';
+import { ActuatorService } from './services/actuatorService.js';
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -62,7 +63,7 @@ const server = http.createServer(async (req, res) => {
         body += chunk;
       }
       const { pipeId, status } = JSON.parse(body);
-      const updated = await DynamoService.updateValveStatus(pipeId, status);
+      const updated = await ActuatorService.manualOverride(pipeId, status);
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, pipe: updated }));

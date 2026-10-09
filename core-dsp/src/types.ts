@@ -155,10 +155,11 @@ export interface GCCPhatOptions {
 }
 
 export interface TriangulationOptions {
-  useAdaptiveGating?: boolean; // Enable STA/LTA transient window gating (default: true)
-  passbandMinHz?: number;      // Lower bandpass cutoff (default: 300 Hz)
-  passbandMaxHz?: number;      // Upper bandpass cutoff (default: 2200 Hz)
-  bandLimited?: boolean;       // Enable band-limited cross-spectral weighting (default: false)
+  useAdaptiveGating?: boolean; // Enable STA/LTA transient window gating (default: false)
+  passbandMinHz?: number;      // Lower bandpass cutoff (default: 770 Hz)
+  passbandMaxHz?: number;      // Upper bandpass cutoff (default: 930 Hz)
+  bandLimited?: boolean;       // Enable band-limited cross-spectral weighting (default: true)
+  taperWidthHz?: number;       // Tukey taper transition width in Hz (default: 70 Hz)
 }
 
 export interface ScenarioBenchmarkMetric {

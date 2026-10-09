@@ -14,10 +14,10 @@ export function computeGCCPhat(
   maxLagSec: number = 0.5,
   options?: GCCPhatOptions
 ): GCCPhatResult {
-  const minFreqHz = options?.minFreqHz ?? 450;
-  const maxFreqHz = options?.maxFreqHz ?? 1500;
+  const minFreqHz = options?.minFreqHz ?? 770;
+  const maxFreqHz = options?.maxFreqHz ?? 930;
   const bandLimited = options?.bandLimited ?? true;
-  const taperWidthHz = options?.taperWidthHz ?? 100;
+  const taperWidthHz = options?.taperWidthHz ?? 70;
 
   const nRaw = Math.max(sig1.length, sig2.length);
   const nFft = nextPowerOfTwo(2 * nRaw);
@@ -88,32 +88,71 @@ export function computeGCCPhat(
     return 0.0;
   };
 
+  // Candidate peak search with concavity and quality metric Q_k
   let bestLag = 0;
+  let bestQ = -Infinity;
+  let bestDelta = 0.0;
   let maxVal = -Infinity;
 
-  for (let lag = -maxLagSamples; lag <= maxLagSamples; lag++) {
-    const val = getCorrAtLag(lag);
-    if (val > maxVal) {
-      maxVal = val;
-      bestLag = lag;
+  // Search local maxima within feasible physical lag window [-maxLagSamples + 1, maxLagSamples - 1]
+  for (let lag = -maxLagSamples + 1; lag <= maxLagSamples - 1; lag++) {
+    const alpha = getCorrAtLag(lag - 1);
+    const beta = getCorrAtLag(lag);
+    const gamma = getCorrAtLag(lag + 1);
+
+    // Local peak condition: strict local maximum with positive amplitude
+    if (beta > alpha && beta > gamma && beta > 0.0) {
+      // Concavity kappa_k = 2 * beta - (alpha + gamma)
+      const kappa = 2.0 * beta - (alpha + gamma);
+      if (kappa > 0.0) {
+        // Parabolic sub-sample shift delta_k
+        let delta = (gamma - alpha) / (2.0 * kappa);
+        if (Math.abs(delta) > 1.0) delta = 0.0;
+
+        // Peak quality score Q_k combining amplitude and curvature to reject spurious noise spikes
+        const Q = beta * (1.0 + Math.min(1.0, kappa / (beta + 1e-6)));
+        if (Q > bestQ) {
+          bestQ = Q;
+          bestLag = lag;
+          bestDelta = delta;
+          maxVal = beta;
+        }
+      }
     }
   }
 
-  // 3-point parabolic peak interpolation for sub-sample accuracy
-  let subSampleCorrection = 0.0;
-  if (bestLag > -maxLagSamples && bestLag < maxLagSamples) {
-    const alpha = getCorrAtLag(bestLag - 1);
-    const beta = getCorrAtLag(bestLag);
-    const gamma = getCorrAtLag(bestLag + 1);
-    const denom = 2.0 * (alpha - 2.0 * beta + gamma);
-    if (Math.abs(denom) > 1e-9) {
-      subSampleCorrection = (alpha - gamma) / denom;
-      if (Math.abs(subSampleCorrection) > 1.0) subSampleCorrection = 0.0;
+  // Fallback to global maximum if no valid concave peak found
+  if (bestQ === -Infinity) {
+    for (let lag = -maxLagSamples; lag <= maxLagSamples; lag++) {
+      const val = getCorrAtLag(lag);
+      if (val > maxVal) {
+        maxVal = val;
+        bestLag = lag;
+      }
+    }
+    if (bestLag > -maxLagSamples && bestLag < maxLagSamples) {
+      const alpha = getCorrAtLag(bestLag - 1);
+      const beta = getCorrAtLag(bestLag);
+      const gamma = getCorrAtLag(bestLag + 1);
+      const kappa = 2.0 * beta - (alpha + gamma);
+      if (kappa > 0.0) {
+        const delta = (gamma - alpha) / (2.0 * kappa);
+        if (Math.abs(delta) <= 1.0) bestDelta = delta;
+      }
     }
   }
 
-  const refinedLagSamples = bestLag + subSampleCorrection;
-  const deltaTSeconds = refinedLagSamples / sampleRateHz;
+  if (maxVal === -Infinity) maxVal = 0.0;
+
+  const refinedLagSamples = bestLag + bestDelta;
+  let deltaTSeconds = refinedLagSamples / sampleRateHz;
+
+  // Strict physical travel-time boundary enforcement: |deltaT| <= maxLagSec
+  if (deltaTSeconds > maxLagSec) {
+    deltaTSeconds = maxLagSec;
+  } else if (deltaTSeconds < -maxLagSec) {
+    deltaTSeconds = -maxLagSec;
+  }
   const deltaTMilliseconds = deltaTSeconds * 1000.0;
 
   // PSLR (Peak-to-Sidelobe Ratio) for confidence score
