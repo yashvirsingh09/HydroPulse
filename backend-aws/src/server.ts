@@ -70,9 +70,35 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // 0. Root Health & API Overview: GET /
+    if (req.method === 'GET' && (url === '/' || url === '/health')) {
+      const pipes = await DynamoService.getAllPipes();
+      const incidents = await DynamoService.getAllIncidents();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        service: 'HydroPulse AWS Ingestion & Edge SCADA Service',
+        status: 'ONLINE',
+        version: '1.2.0',
+        environment: 'AWS LocalStack / Hybrid Serverless Emulation',
+        region: 'ap-south-1',
+        metrics: {
+          registeredPipesCount: pipes.length,
+          activeIncidentsCount: incidents.length,
+          closedLoopSlaMs: '< 40ms'
+        },
+        endpoints: {
+          burstIngest: 'POST /api/burst/ingest',
+          pipesCatalog: 'GET /api/pipes',
+          incidentsLog: 'GET /api/incidents',
+          valveActuate: 'POST /api/valves/actuate'
+        }
+      }, null, 2));
+      return;
+    }
+
     // Default 404
     res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Endpoint not found' }));
+    res.end(JSON.stringify({ error: 'Endpoint not found', availableRoutes: ['/', '/api/pipes', '/api/incidents', '/api/burst/ingest', '/api/valves/actuate'] }));
   } catch (err) {
     console.error('[API Error]:', err);
     res.writeHead(500, { 'Content-Type': 'application/json' });

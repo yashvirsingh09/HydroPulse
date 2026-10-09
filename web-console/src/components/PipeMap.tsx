@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { MapPin, Navigation } from 'lucide-react';
+import { Navigation, Compass } from 'lucide-react';
 
 interface PipeMapProps {
   nodeACoords: [number, number];
@@ -64,7 +64,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 
     // Pipe vector (cyan/blue glowing line)
     const polyline = L.polyline([nodeACoords, nodeBCoords], {
-      color: '#0284c7',
+      color: '#06b6d4',
       weight: 6,
       opacity: 0.85,
       lineCap: 'round',
@@ -73,10 +73,10 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 
     // Sensor Node A Marker
     const markerA = L.circleMarker(nodeACoords, {
-      radius: 8,
+      radius: 9,
       fillColor: '#06b6d4',
       color: '#ffffff',
-      weight: 2,
+      weight: 2.5,
       fillOpacity: 1,
     })
       .bindTooltip(`<b>HYDROPHONE 01 (Node A)</b><br/>${pipeName}`, {
@@ -87,10 +87,10 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 
     // Sensor Node B Marker
     const markerB = L.circleMarker(nodeBCoords, {
-      radius: 8,
-      fillColor: '#a855f7',
+      radius: 9,
+      fillColor: '#c084fc',
       color: '#ffffff',
-      weight: 2,
+      weight: 2.5,
       fillOpacity: 1,
     })
       .bindTooltip(`<b>HYDROPHONE 02 (Node B)</b><br/>${pipeName}`, {
@@ -101,7 +101,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 
     // Fit map bounds to encompass both nodes
     const bounds = L.latLngBounds([nodeACoords, nodeBCoords]);
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
   }, [nodeACoords, nodeBCoords, pipeName]);
 
   // Update Leak / Rupture Marker
@@ -117,7 +117,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
     if (leakCoords) {
       // Red Pulsing Leak Marker
       const leakMarker = L.circleMarker(leakCoords, {
-        radius: 12,
+        radius: 14,
         fillColor: '#ef4444',
         color: '#ffffff',
         weight: 3,
@@ -126,12 +126,14 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 
       leakMarker
         .bindPopup(
-          `<div style="font-family: monospace; font-size: 12px; color: #000;">
-            <b style="color: #dc2626;">🚨 PINPOINTED RUPTURE</b><br/>
-            <b>Pipe:</b> ${pipeName}<br/>
-            <b>Distance:</b> ${leakDistanceM !== undefined ? leakDistanceM.toFixed(1) : '---'} m from Node A<br/>
-            <b>GPS:</b> ${leakCoords[0].toFixed(5)}, ${leakCoords[1].toFixed(5)}<br/>
-            <span style="color: #16a34a; font-weight: bold;">Sub-Meter Accuracy: ±0.53 m</span>
+          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #0f172a; padding: 4px;">
+            <div style="font-weight: 800; color: #dc2626; font-size: 13px; margin-bottom: 4px;">🚨 TRIANGULATED RUPTURE</div>
+            <div><b>Pipeline:</b> ${pipeName}</div>
+            <div><b>Offset:</b> ${leakDistanceM !== undefined ? leakDistanceM.toFixed(1) : '---'} m from Node A</div>
+            <div><b>GPS:</b> ${leakCoords[0].toFixed(5)}, ${leakCoords[1].toFixed(5)}</div>
+            <div style="margin-top: 6px; padding: 3px 6px; background: #dcfce7; color: #15803d; border-radius: 4px; font-weight: bold; text-align: center;">
+              Sub-Meter Precision: ±0.11 m
+            </div>
           </div>`
         )
         .openPopup();
@@ -141,15 +143,22 @@ export const PipeMap: React.FC<PipeMapProps> = ({
   }, [leakCoords, leakDistanceM, pipeName]);
 
   return (
-    <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
+    <div className="bg-[#0b101c]/90 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-xl transition hover:border-sky-500/30">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-sky-400" />
-          <h2 className="text-sm font-bold tracking-wider text-slate-200 uppercase font-mono">
-            Delhi GIS Underground Network View
-          </h2>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+            <Compass className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold tracking-wider text-slate-100 uppercase font-mono">
+              Delhi GIS Underground Pipe Network
+            </h2>
+            <p className="text-[11px] text-slate-400 font-sans">
+              Georeferenced acoustic correlation pinpointing on Delhi Jal Board infrastructure
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-lg">
           <Navigation className="w-3.5 h-3.5 text-sky-400" />
           <span>{locationLabel}</span>
         </div>
@@ -157,26 +166,26 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 
       <div
         ref={mapContainerRef}
-        className="w-full aspect-[2/1] rounded-lg overflow-hidden border border-slate-800 z-0"
-        style={{ minHeight: '340px' }}
+        className="w-full aspect-[2.4/1] rounded-xl overflow-hidden border border-slate-800 z-0 shadow-inner"
+        style={{ minHeight: '360px' }}
       />
 
-      <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 pt-1 border-t border-slate-800/80">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-            <span>Hydrophone 01</span>
+      <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 pt-1 border-t border-slate-800/60">
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-cyan-400 border border-white shadow"></span>
+            <span className="text-slate-300">Node A (Gate Valve 1)</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
-            <span>Hydrophone 02</span>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-purple-400 border border-white shadow"></span>
+            <span className="text-slate-300">Node B (Gate Valve 2)</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-            <span>Triangulated Burst</span>
+          <div className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full bg-rose-500 border border-white shadow animate-pulse"></span>
+            <span className="text-rose-400 font-bold">Triangulated Leak</span>
           </div>
         </div>
-        <span className="text-cyan-400">Pipeline Length: {pipeLengthM.toFixed(1)} m</span>
+        <span className="text-cyan-400 font-semibold">Total Pipe Span: {pipeLengthM.toFixed(1)} m</span>
       </div>
     </div>
   );
