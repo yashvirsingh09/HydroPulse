@@ -10,6 +10,7 @@ interface PipeMapProps {
   pipeName: string;
   pipeLengthM?: number;
   locationLabel?: string;
+  isSimulating?: boolean;
 }
 
 export const PipeMap: React.FC<PipeMapProps> = ({
@@ -23,12 +24,13 @@ export const PipeMap: React.FC<PipeMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const polylineRef = useRef<L.Polyline | null>(null);
+  const polylineBackgroundRef = useRef<L.Polyline | null>(null);
+  const polylineFlowRef = useRef<L.Polyline | null>(null);
   const markerARef = useRef<L.CircleMarker | null>(null);
   const markerBRef = useRef<L.CircleMarker | null>(null);
-  const leakMarkerRef = useRef<L.CircleMarker | null>(null);
+  const leakMarkerRef = useRef<L.Marker | null>(null);
 
-  // Initialize Map with 100% reliable free OpenStreetMap tiles (styled via CSS to dark-matter)
+  // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -39,11 +41,11 @@ export const PipeMap: React.FC<PipeMapProps> = ({
       const map = L.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
         zoom: 15,
-        zoomControl: false, // Cleaner, more industrial
+        zoomControl: false,
         attributionControl: false,
       });
 
-      // Reliable OpenStreetMap Standard Tiles (No API key ever needed, styled dark via CSS filter)
+      // Free reliable OpenStreetMap tiles (styled dark via CSS filter)
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
       }).addTo(map);
@@ -52,25 +54,36 @@ export const PipeMap: React.FC<PipeMapProps> = ({
     }
   }, []);
 
-  // Update pipeline path & sensor node markers when coords change
+  // Update pipeline path with dual-layer flowing water animation
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    if (polylineRef.current) map.removeLayer(polylineRef.current);
+    if (polylineBackgroundRef.current) map.removeLayer(polylineBackgroundRef.current);
+    if (polylineFlowRef.current) map.removeLayer(polylineFlowRef.current);
     if (markerARef.current) map.removeLayer(markerARef.current);
     if (markerBRef.current) map.removeLayer(markerBRef.current);
 
-    // Glowing cyan pipeline vector
-    const polyline = L.polyline([nodeACoords, nodeBCoords], {
-      color: '#06b6d4',
-      weight: 5,
-      opacity: 0.9,
+    // 1. Solid under-pipe line (Deep Cyan)
+    const polylineBg = L.polyline([nodeACoords, nodeBCoords], {
+      color: '#0e7490',
+      weight: 6,
+      opacity: 0.6,
       lineCap: 'round',
     }).addTo(map);
-    polylineRef.current = polyline;
+    polylineBackgroundRef.current = polylineBg;
 
-    // Node A (Hydrophone 01)
+    // 2. Animated water flow dashes on top (Electric Cyan)
+    const polylineFlow = L.polyline([nodeACoords, nodeBCoords], {
+      color: '#22d3ee',
+      weight: 4,
+      opacity: 1,
+      className: 'pipe-flow-animated',
+      lineCap: 'round',
+    }).addTo(map);
+    polylineFlowRef.current = polylineFlow;
+
+    // Node A Marker (Gate Valve 1)
     const markerA = L.circleMarker(nodeACoords, {
       radius: 8,
       fillColor: '#06b6d4',
@@ -78,13 +91,13 @@ export const PipeMap: React.FC<PipeMapProps> = ({
       weight: 2,
       fillOpacity: 1,
     })
-      .bindTooltip(`<b>Node A (Valve 01)</b><br/>${pipeName}`, {
+      .bindTooltip(`<b>Node A (Hydrophone 01)</b><br/>${pipeName}`, {
         permanent: false,
       })
       .addTo(map);
     markerARef.current = markerA;
 
-    // Node B (Hydrophone 02)
+    // Node B Marker (Gate Valve 2)
     const markerB = L.circleMarker(nodeBCoords, {
       radius: 8,
       fillColor: '#c084fc',
@@ -92,7 +105,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
       weight: 2,
       fillOpacity: 1,
     })
-      .bindTooltip(`<b>Node B (Valve 02)</b><br/>${pipeName}`, {
+      .bindTooltip(`<b>Node B (Hydrophone 02)</b><br/>${pipeName}`, {
         permanent: false,
       })
       .addTo(map);
@@ -102,7 +115,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   }, [nodeACoords, nodeBCoords, pipeName]);
 
-  // Update Leak / Rupture Marker
+  // Update Leak / Rupture Marker with Animated Sonar Shockwave Rings
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -113,13 +126,20 @@ export const PipeMap: React.FC<PipeMapProps> = ({
     }
 
     if (leakCoords) {
-      const leakMarker = L.circleMarker(leakCoords, {
-        radius: 12,
-        fillColor: '#ef4444',
-        color: '#ffffff',
-        weight: 3,
-        fillOpacity: 1,
-      }).addTo(map);
+      // Custom pulsing HTML Sonar DivIcon
+      const sonarIcon = L.divIcon({
+        className: 'custom-sonar-icon',
+        html: `
+          <div class="sonar-shockwave-marker">
+            <div class="sonar-shockwave-ring"></div>
+            <div class="sonar-shockwave-dot"></div>
+          </div>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+
+      const leakMarker = L.marker(leakCoords, { icon: sonarIcon }).addTo(map);
 
       leakMarker
         .bindPopup(
@@ -128,7 +148,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
             <div><b>Pipeline:</b> ${pipeName}</div>
             <div><b>Offset:</b> ${leakDistanceM !== undefined ? leakDistanceM.toFixed(1) : '---'} m from Node A</div>
             <div><b>GPS:</b> ${leakCoords[0].toFixed(5)}, ${leakCoords[1].toFixed(5)}</div>
-            <div style="margin-top: 6px; padding: 2px 4px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; font-weight: bold; text-align: center;">
+            <div style="margin-top: 6px; padding: 3px 6px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; font-weight: bold; text-align: center;">
               Sub-Meter Precision: ±0.11 m
             </div>
           </div>`
@@ -140,15 +160,16 @@ export const PipeMap: React.FC<PipeMapProps> = ({
   }, [leakCoords, leakDistanceM, pipeName]);
 
   return (
-    <div className="bg-[#0b101c] border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-xl h-full justify-between">
+    <div className="bg-[#0b101c] border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-xl h-full justify-between transition hover:border-sky-500/40">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
             <Compass className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono">
-              Delhi GIS Underground Pipe Network
+            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono flex items-center gap-1.5">
+              Delhi GIS Pipeline Network
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
             </h2>
           </div>
         </div>
@@ -167,6 +188,9 @@ export const PipeMap: React.FC<PipeMapProps> = ({
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-cyan-300">
             <span className="w-2 h-2 rounded-full bg-cyan-400"></span> Node A
+          </span>
+          <span className="flex items-center gap-1.5 text-cyan-400 font-medium">
+            <span className="inline-block w-4 h-0.5 bg-cyan-400 animate-pulse"></span> Flow Active
           </span>
           <span className="flex items-center gap-1.5 text-purple-300">
             <span className="w-2 h-2 rounded-full bg-purple-400"></span> Node B

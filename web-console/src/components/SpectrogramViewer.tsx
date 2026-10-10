@@ -68,82 +68,101 @@ export const SpectrogramViewer: React.FC<SpectrogramViewerProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    let animId: number;
+    let scanX = 0;
+
     const width = canvas.width;
     const height = canvas.height;
 
-    ctx.fillStyle = '#060a12';
-    ctx.fillRect(0, 0, width, height);
+    // Create offscreen canvas for cached STFT heatmap
+    const offscreen = document.createElement('canvas');
+    offscreen.width = width;
+    offscreen.height = height;
+    const offCtx = offscreen.getContext('2d');
+    if (!offCtx) return;
 
     const numTimes = stftData.timeBins.length;
     const numFreqs = stftData.freqBins.length;
 
-    if (numTimes === 0 || numFreqs === 0) return;
+    if (numTimes > 0 && numFreqs > 0) {
+      const imgData = offCtx.createImageData(width, height);
+      const data = imgData.data;
 
-    const imgData = ctx.createImageData(width, height);
-    const data = imgData.data;
+      for (let py = 0; py < height; py++) {
+        const freqFrac = (height - 1 - py) / (height - 1);
+        const freqIdx = Math.min(numFreqs - 1, Math.floor(freqFrac * numFreqs));
 
-    for (let py = 0; py < height; py++) {
-      const freqFrac = (height - 1 - py) / (height - 1);
-      const freqIdx = Math.min(numFreqs - 1, Math.floor(freqFrac * numFreqs));
+        for (let px = 0; px < width; px++) {
+          const timeFrac = px / (width - 1);
+          const timeIdx = Math.min(numTimes - 1, Math.floor(timeFrac * numTimes));
 
-      for (let px = 0; px < width; px++) {
-        const timeFrac = px / (width - 1);
-        const timeIdx = Math.min(numTimes - 1, Math.floor(timeFrac * numTimes));
+          const normVal = stftData.normalizedPower[timeIdx]?.[freqIdx] ?? 0;
+          const [r, g, b] = getColor(normVal);
 
-        const normVal = stftData.normalizedPower[timeIdx]?.[freqIdx] ?? 0;
-        const [r, g, b] = getColor(normVal);
-
-        const pIdx = (py * width + px) * 4;
-        data[pIdx] = r;
-        data[pIdx + 1] = g;
-        data[pIdx + 2] = b;
-        data[pIdx + 3] = 255;
+          const pIdx = (py * width + px) * 4;
+          data[pIdx] = r;
+          data[pIdx + 1] = g;
+          data[pIdx + 2] = b;
+          data[pIdx + 3] = 255;
+        }
       }
+      offCtx.putImageData(imgData, 0, 0);
     }
 
-    ctx.putImageData(imgData, 0, 0);
+    const render = () => {
+      // Draw cached heatmap
+      ctx.drawImage(offscreen, 0, 0);
 
-    // 850 Hz marker
-    const ruptureBandFreq = 850;
-    const nyquist = sampleRate / 2;
-    const targetY = height - (ruptureBandFreq / nyquist) * height;
+      // 850 Hz Cavitation Resonance Marker Line (Pulsing golden glow)
+      const ruptureBandFreq = 850;
+      const nyquist = sampleRate / 2;
+      const targetY = height - (ruptureBandFreq / nyquist) * height;
 
-    ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(0, targetY);
-    ctx.lineTo(width, targetY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(8, targetY - 14, 180, 14);
-    ctx.font = '700 8.5px "JetBrains Mono", monospace';
-    ctx.fillStyle = '#fde047';
-    ctx.fillText('850 Hz CAVITATION BAND', 12, targetY - 4);
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
-    ctx.lineWidth = 1;
-    for (let f = 1000; f < nyquist; f += 1000) {
-      const y = height - (f / nyquist) * height;
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
+      ctx.moveTo(0, targetY);
+      ctx.lineTo(width, targetY);
       ctx.stroke();
-    }
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(8, targetY - 14, 185, 14);
+      ctx.font = '700 8.5px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#fde047';
+      ctx.fillText('⚡ 850 Hz CAVITATION RESONANCE BAND', 12, targetY - 4);
+
+      // Real-time Spectrogram Time Scanner Beam
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+      ctx.shadowColor = '#f59e0b';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(scanX, 0);
+      ctx.lineTo(scanX, height);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      scanX = (scanX + 1.8) % width;
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animId);
   }, [stftData, sampleRate]);
 
   return (
-    <div className="bg-[#0b101c] border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-xl h-full justify-between">
+    <div className="bg-[#0b101c] border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-xl h-full justify-between transition hover:border-yellow-500/40">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-yellow-400">
-            <Waves className="w-3.5 h-3.5" />
+            <Waves className="w-3.5 h-3.5 animate-pulse" />
           </div>
           <div>
-            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono">
-              STFT Spectral Heatmap
+            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono flex items-center gap-1.5">
+              Live STFT Spectrogram
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-ping"></span>
             </h2>
           </div>
         </div>
@@ -154,7 +173,7 @@ export const SpectrogramViewer: React.FC<SpectrogramViewerProps> = ({
               onClick={() => setActiveChannel('A')}
               className={`px-2 py-0.5 rounded transition font-medium cursor-pointer ${
                 activeChannel === 'A'
-                  ? 'bg-cyan-600 text-white'
+                  ? 'bg-cyan-600 text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -164,7 +183,7 @@ export const SpectrogramViewer: React.FC<SpectrogramViewerProps> = ({
               onClick={() => setActiveChannel('B')}
               className={`px-2 py-0.5 rounded transition font-medium cursor-pointer ${
                 activeChannel === 'B'
-                  ? 'bg-purple-600 text-white'
+                  ? 'bg-purple-600 text-white shadow'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -175,7 +194,7 @@ export const SpectrogramViewer: React.FC<SpectrogramViewerProps> = ({
           {stftData && (
             <span className="flex items-center gap-1 text-[11px] font-mono text-yellow-300 bg-yellow-950/60 border border-yellow-800/60 px-2 py-0.5 rounded">
               <Sparkles className="w-3 h-3 text-yellow-400" />
-              <strong>{stftData.peakFreqHz.toFixed(0)} Hz</strong>
+              Peak: <strong>{stftData.peakFreqHz.toFixed(0)} Hz</strong>
             </span>
           )}
         </div>
@@ -189,16 +208,16 @@ export const SpectrogramViewer: React.FC<SpectrogramViewerProps> = ({
           className="w-full h-full block"
         />
         <div className="absolute right-2 top-2 bottom-2 flex flex-col justify-between text-[8px] font-mono text-slate-400 pointer-events-none text-right font-medium">
-          <span className="bg-slate-950/70 px-1 rounded">5 kHz</span>
-          <span className="bg-slate-950/70 px-1 rounded">2.5 kHz</span>
-          <span className="bg-slate-950/70 px-1 rounded">0 Hz</span>
+          <span className="bg-slate-950/80 px-1 rounded">5.0 kHz</span>
+          <span className="bg-slate-950/80 px-1 rounded">2.5 kHz</span>
+          <span className="bg-slate-950/80 px-1 rounded">0 Hz</span>
         </div>
       </div>
 
       <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/60">
-        <span>T = 0 ms</span>
-        <span className="text-yellow-400/90 font-sans">Hann: 128 (12.8ms) • Hop: 32</span>
-        <span>T = 1000 ms</span>
+        <span className="text-yellow-400/90 font-sans">Dynamic Scanbeam: 100 μs resolution</span>
+        <span className="text-slate-500">Hann 128 • Hop 32 • FFT 128</span>
+        <span>Nyquist: 5 kHz</span>
       </div>
     </div>
   );

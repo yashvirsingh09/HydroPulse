@@ -11,7 +11,7 @@
   }
 }
 
-/* Custom dark tile styling for OpenStreetMap so it looks like military/SCADA dark matter without any API keys */
+/* Custom dark tile styling for OpenStreetMap */
 .leaflet-layer,
 .leaflet-control-zoom-in,
 .leaflet-control-zoom-out,
@@ -23,38 +23,69 @@
   background-color: #060911 !important;
 }
 
+/* Animated Flowing Pipe Line */
+@keyframes pipe-water-flow {
+  from {
+    stroke-dashoffset: 60;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.leaflet-interactive.pipe-flow-animated {
+  stroke-dasharray: 8 12;
+  animation: pipe-water-flow 1.2s linear infinite;
+}
+
+/* Pulsing Sonar Rupture Marker */
+@keyframes sonar-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+.sonar-shockwave-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.sonar-shockwave-ring {
+  position: absolute;
+  inset: -12px;
+  border-radius: 9999px;
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.25);
+  animation: sonar-ring 1.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+}
+
+.sonar-shockwave-dot {
+  position: absolute;
+  inset: 4px;
+  border-radius: 9999px;
+  background: #ef4444;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 12px #ef4444;
+}
+
 /* Dark Leaflet Popup Styling */
 .leaflet-popup-content-wrapper {
   background: #090e1a !important;
   color: #f1f5f9 !important;
-  border: 1px solid rgba(6, 182, 212, 0.4) !important;
+  border: 1px solid rgba(6, 182, 212, 0.5) !important;
   border-radius: 10px !important;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8) !important;
 }
 
 .leaflet-popup-tip {
   background: #090e1a !important;
-  border: 1px solid rgba(6, 182, 212, 0.4) !important;
-}
-
-/* Custom telemetry pulse animations */
-@keyframes radar-pulse {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.9;
-  }
-  70% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
-}
-
-.radar-ping {
-  animation: radar-pulse 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  border: 1px solid rgba(6, 182, 212, 0.5) !important;
 }
 
 /* Custom scrollbars */
