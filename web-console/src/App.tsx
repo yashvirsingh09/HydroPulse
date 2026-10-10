@@ -34,7 +34,6 @@ export default function App() {
   const [samplesA, setSamplesA] = useState<number[]>([]);
   const [samplesB, setSamplesB] = useState<number[]>([]);
   const [correlationCurve, setCorrelationCurve] = useState<number[]>([]);
-  const [lagIndices, setLagIndices] = useState<number[]>([]);
   const [sampleLag, setSampleLag] = useState<number>(103.3);
   const [deltaTMs, setDeltaTMs] = useState<number>(103.3);
   const [confidenceScore, setConfidenceScore] = useState<number>(95.4);
@@ -100,9 +99,7 @@ export default function App() {
         scen.coordinates.nodeB
       );
       setLeakCoords(coords);
-
       setCorrelationCurve(gcc.correlationCurve);
-      setLagIndices(gcc.lagIndices);
     });
   };
 
@@ -126,7 +123,6 @@ export default function App() {
     setIsSimulating(true);
 
     try {
-      // Attempt to invoke the live AWS Lambda backend
       const res = await fetch('http://localhost:5000/api/burst/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -147,14 +143,13 @@ export default function App() {
         setLeakCoords(data.incident.leakCoordinates);
         setValveStatus(data.pipeStatus.valveStatus);
         setCorrelationCurve(data.visualization.correlationCurve);
-        setLagIndices(data.visualization.lagIndices);
         setSampleLag(data.visualization.sampleLag);
         setIncidents((prev) => [data.incident, ...prev]);
       } else {
         throw new Error('Backend offline');
       }
     } catch {
-      // Zero-dependency offline fallback: execute real DSP triangulation directly in browser!
+      // Offline fallback
       const result = triangulatePipeLeak(
         activeScenario.pipeParams,
         { nodeId: 1, samples: samplesA, sampleRateHz: 10000 },
@@ -176,9 +171,7 @@ export default function App() {
       setLeakDistanceM(result.estimatedLeakDistanceM);
       setLeakCoords(coords);
       setValveStatus('THROTTLED_50');
-
       setCorrelationCurve(gcc.correlationCurve);
-      setLagIndices(gcc.lagIndices);
       setSampleLag(gcc.sampleLag);
 
       const err = Math.abs(result.estimatedLeakDistanceM - activeScenario.defaultRuptureDistanceM);
@@ -217,65 +210,60 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b12] text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-[#05080e] text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] select-none">
       {/* Top SCADA Header */}
-      <header className="border-b border-slate-800/80 bg-[#090e18]/95 backdrop-blur-md px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50 shadow-xl">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-sky-600/30 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-lg shadow-cyan-950/60">
-            <Droplets className="w-6 h-6 animate-pulse" />
+      <header className="border-b border-slate-800/80 bg-[#070b13] px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500/20 to-sky-600/30 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-md">
+            <Droplets className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-extrabold tracking-tight text-white font-mono flex items-center gap-2">
-                HYDROPULSE
-                <span className="text-[11px] font-sans font-bold px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300">
-                  SCADA v1.2.0
-                </span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base font-extrabold tracking-tight text-white font-mono flex items-center gap-2">
+                HYDROPULSE <span className="text-[10px] font-sans font-bold px-2 py-0.2 rounded-full bg-cyan-950/80 border border-cyan-700/60 text-cyan-300">SCADA v1.2</span>
               </h1>
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" title="Telemetry Live"></span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400"></span>
             </div>
-            <p className="text-xs text-slate-400 font-medium">
+            <p className="text-[11px] text-slate-400 font-medium">
               Autonomous Acoustic Water Hammer Triangulation & Mitigation Platform
             </p>
           </div>
         </div>
 
         {/* Telemetry Stats Bar */}
-        <div className="flex flex-wrap items-center gap-2.5 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
           <a
             href="http://localhost:5000/"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:border-cyan-500/50 transition cursor-pointer shadow-sm"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300 hover:border-cyan-500/50 transition cursor-pointer"
           >
-            <Server className={`w-3.5 h-3.5 ${backendOnline ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <span>API :5000 ({backendOnline ? 'ONLINE' : 'STANDALONE'})</span>
-            <ExternalLink className="w-3 h-3 text-slate-500" />
+            <Server className={`w-3 h-3 ${backendOnline ? 'text-emerald-400' : 'text-amber-400'}`} />
+            <span>API: 5000 ({backendOnline ? 'ONLINE' : 'OFFLINE'})</span>
+            <ExternalLink className="w-2.5 h-2.5 text-slate-500" />
           </a>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 shadow-sm">
-            <Radio className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+            <Radio className="w-3 h-3 text-emerald-400" />
             <span>10 kHz Hydrophones</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 shadow-sm">
-            <Activity className="w-3.5 h-3.5 text-purple-400" />
-            <span>Korteweg vs: <strong>{activeScenario.nominalWaveSpeedMs.toFixed(0)} m/s</strong></span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-300">
+            <Activity className="w-3 h-3 text-purple-400" />
+            <span>vs: <strong>{activeScenario.nominalWaveSpeedMs.toFixed(0)} m/s</strong></span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/70 border border-emerald-800/80 text-emerald-300 font-bold shadow-md shadow-emerald-950/50">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Sub-Meter: ±0.11 m</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/70 border border-emerald-800/80 text-emerald-300 font-bold">
+            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+            <span>Precision: ±0.11 m</span>
           </div>
         </div>
       </header>
 
-      {/* Scenario Switcher & Environmental Controls Banner */}
-      <section className="bg-[#090d16] border-b border-slate-800/80 px-6 py-3.5 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          {/* Scenario Selector Tabs */}
+      {/* Scenario Switcher Toolbar */}
+      <section className="bg-[#070b13] border-b border-slate-800/70 px-5 py-2">
+        <div className="w-full flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400 mr-1.5">
-              <Layers className="w-4 h-4 text-cyan-400" />
-              <span>Delhi Municipal Pipeline:</span>
-            </div>
+            <span className="text-xs font-mono text-slate-400 flex items-center gap-1.5 mr-1">
+              <Layers className="w-3.5 h-3.5 text-cyan-400" /> Pipeline:
+            </span>
             {(Object.keys(DELHI_PIPE_SCENARIOS) as ScenarioId[]).map((id) => {
               const s = DELHI_PIPE_SCENARIOS[id];
               const isSelected = id === scenarioId;
@@ -283,14 +271,14 @@ export default function App() {
                 <button
                   key={id}
                   onClick={() => handleScenarioChange(id)}
-                  className={`text-xs font-mono px-3.5 py-1.5 rounded-xl border transition flex items-center gap-2 cursor-pointer ${
+                  className={`text-xs font-mono px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 cursor-pointer ${
                     isSelected
-                      ? 'bg-cyan-600/25 border-cyan-500 text-cyan-200 font-bold shadow-md shadow-cyan-950/40'
+                      ? 'bg-cyan-600/25 border-cyan-500 text-cyan-200 font-bold shadow'
                       : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
                   }`}
                 >
                   <span>{s.name.split('(')[0].trim()}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                  <span className="text-[9px] px-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
                     {s.pipeParams.material}
                   </span>
                 </button>
@@ -298,20 +286,18 @@ export default function App() {
             })}
           </div>
 
-          {/* SNR Selector & Physics Info */}
-          <div className="flex items-center gap-4 text-xs font-mono">
-            {/* SNR Slider / Selector */}
-            <div className="flex items-center gap-2.5 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl shadow-sm">
-              <Sliders className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-slate-400">Acoustic SNR:</span>
+          <div className="flex items-center gap-3 text-xs font-mono">
+            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-lg">
+              <Sliders className="w-3 h-3 text-amber-400" />
+              <span className="text-slate-400">SNR:</span>
               <div className="flex items-center gap-1">
                 {[24, 18, 12, 6].map((snr) => (
                   <button
                     key={snr}
                     onClick={() => handleSnrChange(snr)}
-                    className={`px-2 py-0.5 rounded-md text-[11px] transition cursor-pointer font-semibold ${
+                    className={`px-1.5 py-0.2 rounded text-[11px] transition cursor-pointer ${
                       snrDb === snr
-                        ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50 shadow-sm'
+                        ? 'bg-amber-500/30 text-amber-300 font-bold border border-amber-500/50'
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
@@ -321,14 +307,13 @@ export default function App() {
               </div>
             </div>
 
-            {/* Quick Physics Summary */}
-            <div className="hidden xl:flex items-center gap-3 text-slate-400 font-medium">
-              <span className="flex items-center gap-1.5">
-                <Gauge className="w-3.5 h-3.5 text-sky-400" />
+            <div className="hidden lg:flex items-center gap-2 text-slate-400">
+              <span className="flex items-center gap-1">
+                <Gauge className="w-3 h-3 text-sky-400" />
                 ⌀ {((activeScenario.pipeParams.diameterM ?? 0.4) * 1000).toFixed(0)} mm
               </span>
               <span>•</span>
-              <span>L: {activeScenario.pipeParams.lengthM.toFixed(0)} m</span>
+              <span>Span: {activeScenario.pipeParams.lengthM.toFixed(0)} m</span>
               <span>•</span>
               <span className="text-amber-400 font-bold">Rupture: {activeScenario.defaultRuptureDistanceM.toFixed(0)} m</span>
             </div>
@@ -336,10 +321,10 @@ export default function App() {
         </div>
       </section>
 
-      {/* Main SCADA Workspace */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full flex flex-col gap-6">
-        {/* Row 1: Dual Oscilloscope & 2D STFT Spectrogram Heatmap */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Main Single-Screen 16:9 SCADA Workspace Grid */}
+      <main className="flex-1 p-3.5 w-full flex flex-col gap-3">
+        {/* Row 1: Dual Oscilloscope + STFT Spectrogram */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 flex-1 min-h-[220px]">
           <WaveformViewer
             samplesA={samplesA}
             samplesB={samplesB}
@@ -353,47 +338,50 @@ export default function App() {
           />
         </div>
 
-        {/* Row 2: GCC-PHAT Cross-Correlation Curve & Closed-Loop Actuator Panel */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <CorrelationChart
-            correlationCurve={correlationCurve}
-            lagIndices={lagIndices}
-            sampleLag={sampleLag}
-            confidenceScore={confidenceScore}
-          />
-          <ActuatorPanel
-            prvValveId={activeScenario.prvValveId}
-            valveStatus={valveStatus}
-            onUpdateValveStatus={handleUpdateValveStatus}
-            isSimulating={isSimulating}
-            onTriggerSimulation={triggerSimulation}
-          />
+        {/* Row 2: GCC-PHAT Curve + Delhi GIS Map + Closed-Loop Actuator */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1 min-h-[260px]">
+          <div className="md:col-span-1">
+            <CorrelationChart
+              correlationCurve={correlationCurve}
+              sampleLag={sampleLag}
+              confidenceScore={confidenceScore}
+            />
+          </div>
+          <div className="md:col-span-1">
+            <PipeMap
+              nodeACoords={activeScenario.coordinates.nodeA}
+              nodeBCoords={activeScenario.coordinates.nodeB}
+              leakCoords={leakCoords}
+              leakDistanceM={leakDistanceM}
+              pipeName={activeScenario.name}
+              pipeLengthM={activeScenario.pipeParams.lengthM}
+              locationLabel={activeScenario.location}
+            />
+          </div>
+          <div className="md:col-span-1">
+            <ActuatorPanel
+              prvValveId={activeScenario.prvValveId}
+              valveStatus={valveStatus}
+              onUpdateValveStatus={handleUpdateValveStatus}
+              isSimulating={isSimulating}
+              onTriggerSimulation={triggerSimulation}
+            />
+          </div>
         </div>
 
-        {/* Row 3: Delhi GIS Underground Map */}
-        <div className="grid grid-cols-1 gap-6">
-          <PipeMap
-            nodeACoords={activeScenario.coordinates.nodeA}
-            nodeBCoords={activeScenario.coordinates.nodeB}
-            leakCoords={leakCoords}
-            leakDistanceM={leakDistanceM}
-            pipeName={activeScenario.name}
-            pipeLengthM={activeScenario.pipeParams.lengthM}
-            locationLabel={activeScenario.location}
-          />
+        {/* Row 3: Compact Live Incident History Log */}
+        <div>
+          <IncidentHistory incidents={incidents} />
         </div>
-
-        {/* Row 4: Triangulated Incident History Table */}
-        <IncidentHistory incidents={incidents} />
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 px-6 py-4 bg-[#080c14] text-center text-xs text-slate-500 font-mono flex flex-wrap items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Zap className="w-3.5 h-3.5 text-cyan-400" />
+      {/* Compact Status Footer */}
+      <footer className="border-t border-slate-800/80 px-5 py-2 bg-[#060a12] text-xs text-slate-500 font-mono flex flex-wrap items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Zap className="w-3 h-3 text-cyan-400" />
           <span>HydroPulse • WeMakeDevs Bharat Builds Tour (Track 02: Heat and Water)</span>
         </div>
-        <span>Polyglot Architecture: Embedded C + Pure TypeScript DSP + AWS Serverless + React 19 SCADA</span>
+        <span>Polyglot SCADA: Embedded C + TypeScript DSP + AWS Serverless (ap-south-1)</span>
       </footer>
     </div>
   );

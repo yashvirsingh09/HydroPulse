@@ -28,7 +28,7 @@ export const PipeMap: React.FC<PipeMapProps> = ({
   const markerBRef = useRef<L.CircleMarker | null>(null);
   const leakMarkerRef = useRef<L.CircleMarker | null>(null);
 
-  // Initialize Map
+  // Initialize Map with 100% reliable free OpenStreetMap tiles (styled via CSS to dark-matter)
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -39,12 +39,12 @@ export const PipeMap: React.FC<PipeMapProps> = ({
       const map = L.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
         zoom: 15,
-        zoomControl: true,
+        zoomControl: false, // Cleaner, more industrial
+        attributionControl: false,
       });
 
-      // Dark-mode CartoDB tile layer
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      // Reliable OpenStreetMap Standard Tiles (No API key ever needed, styled dark via CSS filter)
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
       }).addTo(map);
 
@@ -57,51 +57,49 @@ export const PipeMap: React.FC<PipeMapProps> = ({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Remove old layers
     if (polylineRef.current) map.removeLayer(polylineRef.current);
     if (markerARef.current) map.removeLayer(markerARef.current);
     if (markerBRef.current) map.removeLayer(markerBRef.current);
 
-    // Pipe vector (cyan/blue glowing line)
+    // Glowing cyan pipeline vector
     const polyline = L.polyline([nodeACoords, nodeBCoords], {
       color: '#06b6d4',
-      weight: 6,
-      opacity: 0.85,
+      weight: 5,
+      opacity: 0.9,
       lineCap: 'round',
     }).addTo(map);
     polylineRef.current = polyline;
 
-    // Sensor Node A Marker
+    // Node A (Hydrophone 01)
     const markerA = L.circleMarker(nodeACoords, {
-      radius: 9,
+      radius: 8,
       fillColor: '#06b6d4',
       color: '#ffffff',
-      weight: 2.5,
+      weight: 2,
       fillOpacity: 1,
     })
-      .bindTooltip(`<b>HYDROPHONE 01 (Node A)</b><br/>${pipeName}`, {
+      .bindTooltip(`<b>Node A (Valve 01)</b><br/>${pipeName}`, {
         permanent: false,
       })
       .addTo(map);
     markerARef.current = markerA;
 
-    // Sensor Node B Marker
+    // Node B (Hydrophone 02)
     const markerB = L.circleMarker(nodeBCoords, {
-      radius: 9,
+      radius: 8,
       fillColor: '#c084fc',
       color: '#ffffff',
-      weight: 2.5,
+      weight: 2,
       fillOpacity: 1,
     })
-      .bindTooltip(`<b>HYDROPHONE 02 (Node B)</b><br/>${pipeName}`, {
+      .bindTooltip(`<b>Node B (Valve 02)</b><br/>${pipeName}`, {
         permanent: false,
       })
       .addTo(map);
     markerBRef.current = markerB;
 
-    // Fit map bounds to encompass both nodes
     const bounds = L.latLngBounds([nodeACoords, nodeBCoords]);
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   }, [nodeACoords, nodeBCoords, pipeName]);
 
   // Update Leak / Rupture Marker
@@ -115,23 +113,22 @@ export const PipeMap: React.FC<PipeMapProps> = ({
     }
 
     if (leakCoords) {
-      // Red Pulsing Leak Marker
       const leakMarker = L.circleMarker(leakCoords, {
-        radius: 14,
+        radius: 12,
         fillColor: '#ef4444',
         color: '#ffffff',
         weight: 3,
-        fillOpacity: 0.95,
+        fillOpacity: 1,
       }).addTo(map);
 
       leakMarker
         .bindPopup(
-          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #0f172a; padding: 4px;">
-            <div style="font-weight: 800; color: #dc2626; font-size: 13px; margin-bottom: 4px;">🚨 TRIANGULATED RUPTURE</div>
+          `<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px;">
+            <div style="font-weight: 800; color: #f87171; font-size: 12px; margin-bottom: 4px;">🚨 TRIANGULATED BURST</div>
             <div><b>Pipeline:</b> ${pipeName}</div>
             <div><b>Offset:</b> ${leakDistanceM !== undefined ? leakDistanceM.toFixed(1) : '---'} m from Node A</div>
             <div><b>GPS:</b> ${leakCoords[0].toFixed(5)}, ${leakCoords[1].toFixed(5)}</div>
-            <div style="margin-top: 6px; padding: 3px 6px; background: #dcfce7; color: #15803d; border-radius: 4px; font-weight: bold; text-align: center;">
+            <div style="margin-top: 6px; padding: 2px 4px; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 4px; font-weight: bold; text-align: center;">
               Sub-Meter Precision: ±0.11 m
             </div>
           </div>`
@@ -143,49 +140,42 @@ export const PipeMap: React.FC<PipeMapProps> = ({
   }, [leakCoords, leakDistanceM, pipeName]);
 
   return (
-    <div className="bg-[#0b101c]/90 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-4 shadow-2xl backdrop-blur-xl transition hover:border-sky-500/30">
+    <div className="bg-[#0b101c] border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 shadow-xl h-full justify-between">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
-            <Compass className="w-4 h-4" />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+            <Compass className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold tracking-wider text-slate-100 uppercase font-mono">
+            <h2 className="text-xs font-bold tracking-wider text-slate-100 uppercase font-mono">
               Delhi GIS Underground Pipe Network
             </h2>
-            <p className="text-[11px] text-slate-400 font-sans">
-              Georeferenced acoustic correlation pinpointing on Delhi Jal Board infrastructure
-            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-300 bg-slate-900/80 border border-slate-800 px-3 py-1 rounded-lg">
-          <Navigation className="w-3.5 h-3.5 text-sky-400" />
-          <span>{locationLabel}</span>
+        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded">
+          <Navigation className="w-3 h-3 text-sky-400" />
+          <span className="truncate max-w-[200px]">{locationLabel}</span>
         </div>
       </div>
 
       <div
         ref={mapContainerRef}
-        className="w-full aspect-[2.4/1] rounded-xl overflow-hidden border border-slate-800 z-0 shadow-inner"
-        style={{ minHeight: '360px' }}
+        className="w-full flex-1 min-h-[240px] rounded-lg overflow-hidden border border-slate-800/80 z-0 shadow-inner"
       />
 
-      <div className="flex flex-wrap items-center justify-between text-xs font-mono text-slate-400 pt-1 border-t border-slate-800/60">
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-cyan-400 border border-white shadow"></span>
-            <span className="text-slate-300">Node A (Gate Valve 1)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-purple-400 border border-white shadow"></span>
-            <span className="text-slate-300">Node B (Gate Valve 2)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-rose-500 border border-white shadow animate-pulse"></span>
-            <span className="text-rose-400 font-bold">Triangulated Leak</span>
-          </div>
+      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/60">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-cyan-300">
+            <span className="w-2 h-2 rounded-full bg-cyan-400"></span> Node A
+          </span>
+          <span className="flex items-center gap-1.5 text-purple-300">
+            <span className="w-2 h-2 rounded-full bg-purple-400"></span> Node B
+          </span>
+          <span className="flex items-center gap-1.5 text-rose-400 font-bold">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> Rupture
+          </span>
         </div>
-        <span className="text-cyan-400 font-semibold">Total Pipe Span: {pipeLengthM.toFixed(1)} m</span>
+        <span className="text-slate-300 font-semibold">Span: {pipeLengthM.toFixed(1)} m</span>
       </div>
     </div>
   );
