@@ -195,9 +195,15 @@ export const PipeMap: React.FC<PipeMapProps> = ({
           <span className="flex items-center gap-1.5 text-purple-300">
             <span className="w-2 h-2 rounded-full bg-purple-400"></span> Node B
           </span>
-          <span className="flex items-center gap-1.5 text-rose-400 font-bold">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> Rupture
-          </span>
+          {leakCoords ? (
+            <span className="flex items-center gap-1.5 text-rose-400 font-bold">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> Rupture Pinpointed
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span> Pipeline Nominal
+            </span>
+          )}
         </div>
         <span className="text-slate-300 font-semibold">Span: {pipeLengthM.toFixed(1)} m</span>
       </div>

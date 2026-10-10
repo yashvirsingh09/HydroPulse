@@ -35,11 +35,11 @@ export default function App() {
   const [samplesA, setSamplesA] = useState<number[]>([]);
   const [samplesB, setSamplesB] = useState<number[]>([]);
   const [correlationCurve, setCorrelationCurve] = useState<number[]>([]);
-  const [sampleLag, setSampleLag] = useState<number>(103.3);
-  const [deltaTMs, setDeltaTMs] = useState<number>(103.3);
-  const [confidenceScore, setConfidenceScore] = useState<number>(95.4);
-  const [leakCoords, setLeakCoords] = useState<[number, number]>(activeScenario.coordinates.nodeA);
-  const [leakDistanceM, setLeakDistanceM] = useState<number>(activeScenario.defaultRuptureDistanceM);
+  const [sampleLag, setSampleLag] = useState<number>(0);
+  const [deltaTMs, setDeltaTMs] = useState<number>(0);
+  const [confidenceScore, setConfidenceScore] = useState<number>(0);
+  const [leakCoords, setLeakCoords] = useState<[number, number] | undefined>(undefined);
+  const [leakDistanceM, setLeakDistanceM] = useState<number | undefined>(undefined);
   const [valveStatus, setValveStatus] = useState<'OPEN' | 'THROTTLED_50' | 'CLOSED'>('OPEN');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [incidents, setIncidents] = useState<IncidentItem[]>([]);
@@ -88,7 +88,7 @@ export default function App() {
     return [Number(lat.toFixed(6)), Number(lng.toFixed(6))];
   };
 
-  // Synthesize and load scenario burst
+  // Synthesize baseline ambient acoustic signal on scenario load
   const loadScenario = (targetId: ScenarioId, targetSnr: number = snrDb) => {
     const scen = DELHI_PIPE_SCENARIOS[targetId];
     const burst = generateScenarioBurst(targetId, {
@@ -100,29 +100,13 @@ export default function App() {
     startTransition(() => {
       setSamplesA(Array.from(burst.node_a.samples));
       setSamplesB(Array.from(burst.node_b.samples));
-
-      const result = triangulatePipeLeak(
-        scen.pipeParams,
-        burst.node_a,
-        burst.node_b,
-        scen.defaultRuptureDistanceM
-      );
-
-      const gcc = computeGCCPhat(burst.node_a.samples, burst.node_b.samples, 10000, 0.5);
-
-      setDeltaTMs(result.deltaTMilliseconds);
-      setSampleLag(gcc.sampleLag);
-      setConfidenceScore(result.confidenceScore);
-      setLeakDistanceM(result.estimatedLeakDistanceM);
-
-      const coords = computeGpsCoordinates(
-        result.estimatedLeakDistanceM,
-        scen.pipeParams.lengthM,
-        scen.coordinates.nodeA,
-        scen.coordinates.nodeB
-      );
-      setLeakCoords(coords);
-      setCorrelationCurve(gcc.correlationCurve);
+      // Reset leak pinpoint until user explicitly simulates rupture!
+      setLeakCoords(undefined);
+      setLeakDistanceM(undefined);
+      setDeltaTMs(0);
+      setSampleLag(0);
+      setConfidenceScore(0);
+      setCorrelationCurve([]);
     });
   };
 
