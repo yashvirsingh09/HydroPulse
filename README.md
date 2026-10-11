@@ -7,7 +7,7 @@
 [![BOM Cost](https://img.shields.io/badge/Edge%20BOM-$48.00%20USD%20%2F%20₹3%2C980%20INR-success.svg)](docs/HARDWARE_ARCHITECTURE.md#6-bill-of-materials-bom--municipal-scaling-economics)
 [![DSP Engine](https://img.shields.io/badge/DSP-GCC--PHAT%20%2B%20Korteweg%20Solver-purple.svg)](core-dsp/)
 [![Benchmark Pass Rate](https://img.shields.io/badge/80--Run%20Benchmark-Sub--Meter%20Precision-brightgreen.svg)](core-dsp/tests/benchmark.test.ts)
-[![Demo Video](https://img.shields.io/badge/Demo%20Video-Watch%203--Min%20Walkthrough-red.svg?logo=youtube)](#-3-minute-live-scada-demo-video)
+[![Demo Video](https://img.shields.io/badge/Demo%20Video-Watch%203--Min%20Walkthrough-red.svg?logo=youtube)](https://youtu.be/1PqwuHI0gMA)
 
 ---
 
@@ -15,10 +15,10 @@
 
 > **Watch the full end-to-end hackathon walkthrough:** Synthetic Korteweg acoustic wave generation, 10 kHz dual hydrophone ADC streaming, sub-meter GCC-PHAT triangulation on Delhi GIS maps, and closed-loop PRV valve throttling in $< 50\text{ ms}$.
 
-[![HydroPulse Hackathon Demo Video](docs/images/leak_pinpoint_dtu_map.png)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)
+[![HydroPulse Hackathon Demo Video](docs/images/leak_pinpoint_dtu_map.png)](https://youtu.be/1PqwuHI0gMA)
 
-> 🔗 **Video Submission Link:** [Watch Demo on YouTube / Google Drive](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)  
-> *(Video file ready in repo: `New folder/HydroPulse_Final_Demo_Submission.mp4` — Duration: 2m 57s, 1080p, AAC 256k, cleaned professional audio)*
+> 🔗 **Video Submission Link:** [Watch Demo on YouTube (https://youtu.be/1PqwuHI0gMA)](https://youtu.be/1PqwuHI0gMA)  
+> *(Duration: 2m 57s, 1080p, AAC 256k, cleaned professional audio)*
 
 ---
 
