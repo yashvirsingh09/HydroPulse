@@ -273,6 +273,6 @@ hydropulse/
 
 ## 🏆 WeMakeDevs Bharat Builds Environmental Hacks Submission
 * **Track:** Track 02 — Heat and Water (Autonomous Water Infrastructure Resilience)
-* **Team:** HydroPulse Systems
+* **Team:** Greeenn
 * **Target Cities:** Delhi Jal Board (DJB) Pilot Network (Bawana, Rohini, Wazirabad, Okhla)
 * **License:** Apache-2.0
