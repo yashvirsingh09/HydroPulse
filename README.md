@@ -7,6 +7,18 @@
 [![BOM Cost](https://img.shields.io/badge/Edge%20BOM-$48.00%20USD%20%2F%20₹3%2C980%20INR-success.svg)](docs/HARDWARE_ARCHITECTURE.md#6-bill-of-materials-bom--municipal-scaling-economics)
 [![DSP Engine](https://img.shields.io/badge/DSP-GCC--PHAT%20%2B%20Korteweg%20Solver-purple.svg)](core-dsp/)
 [![Benchmark Pass Rate](https://img.shields.io/badge/80--Run%20Benchmark-Sub--Meter%20Precision-brightgreen.svg)](core-dsp/tests/benchmark.test.ts)
+[![Demo Video](https://img.shields.io/badge/Demo%20Video-Watch%203--Min%20Walkthrough-red.svg?logo=youtube)](#-3-minute-live-scada-demo-video)
+
+---
+
+## 🎥 3-Minute Live SCADA Demo Video
+
+> **Watch the full end-to-end hackathon walkthrough:** Synthetic Korteweg acoustic wave generation, 10 kHz dual hydrophone ADC streaming, sub-meter GCC-PHAT triangulation on Delhi GIS maps, and closed-loop PRV valve throttling in $< 50\text{ ms}$.
+
+[![HydroPulse Hackathon Demo Video](docs/images/leak_pinpoint_dtu_map.png)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)
+
+> 🔗 **Video Submission Link:** [Watch Demo on YouTube / Google Drive](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)  
+> *(Video file ready in repo: `New folder/HydroPulse_Final_Demo_Submission.mp4` — Duration: 2m 57s, 1080p, AAC 256k, cleaned professional audio)*
 
 ---
 
@@ -19,6 +31,36 @@ Municipal water utilities across India (Delhi Jal Board, BWSSB Bengaluru) lose *
 3. **Robust Acoustic Triangulation Engine:** Band-limited GCC-PHAT (Generalized Cross-Correlation with Phase Transform) and zero-phase Butterworth filtering achieving **sub-meter localization ($\le 1.5\text{ m}$)** even under severe noise environments down to **6 dB SNR**.
 4. **Turnkey AWS Serverless Cloud (`backend-aws/`, `template.yaml`):** Event-driven ARM64 Graviton2 Lambda, on-demand DynamoDB ($0.00 idle cost, 100% Free Tier), Amazon SNS SMS work-order dispatch, and **autonomous closed-loop PRV valve throttling in $< 50\text{ ms}$**.
 5. **Real-Time Operator SCADA Console (`web-console/`):** Next.js 15 dashboard featuring live dual-channel oscilloscopes, 2D frequency spectrograms, Web Audio acoustic burst playback, and interactive Leaflet GIS mapping across Delhi's municipal network.
+
+---
+
+## 🖥️ Live Operator SCADA Mission Control Showcase
+
+### 1. Unified 16:9 Operator SCADA Console
+Real-time browser-based SCADA interface displaying live municipal pipeline selection, Korteweg wave velocity calculations ($v_s \approx 1258\text{ m/s}$), active streaming packet counters ($10{,}000\text{ S/s}$), dual-channel CRT oscilloscope, and 2D STFT spectrogram.
+
+![HydroPulse SCADA Overview](docs/images/scada_dashboard_overview.png)
+
+---
+
+### 2. Dual-Channel CRT Oscilloscope & Cavitation Spectrogram
+Microsecond-grade dual-channel acoustic waveform visualization (CH 1 Node A, CH 2 Node B) with phosphor persistence decay alongside a 2D STFT spectrogram isolating the characteristic **$850\text{ Hz}$ cavitation resonance band**.
+
+![Live CRT Oscilloscope and STFT Spectrogram](docs/images/crt_oscilloscope_and_spectrogram.png)
+
+---
+
+### 3. Sub-Meter Rupture Pinpoint on Delhi GIS Map
+Autonomous cross-correlation peak extraction ($\Delta t = 1033.96\text{ pts}$, $99.8\%$ confidence) pinpointing the subterranean burst location on Main Bawana Road near Delhi Technological University ($185.0\text{ m}$ from Node A) with **$\pm 0.11\text{ m}$ sub-meter precision** and closed-loop PRV valve throttle active ($35.8\text{ ms}$ SLA).
+
+![DTU Rupture Pinpoint on Delhi GIS Map](docs/images/leak_pinpoint_dtu_map.png)
+
+---
+
+### 4. Severe Noise Rejection (6 dB SNR) & Wazirabad 1200m Stress Test
+Algorithmic resilience verified on a $1200\text{ m}$ Mild Steel transmission main under heavy $6\text{ dB SNR}$ traffic noise. The band-limited GCC-PHAT engine suppresses spurious acoustic reflections, localizes the rupture at $448.6\text{ m}$ ($92.8\%$ confidence), throttles the upstream PRV to 50% flow, and logs an immutable audit trail to Amazon DynamoDB in $< 50\text{ ms}$.
+
+![Wazirabad 1200m Rupture and Audit Log](docs/images/wazirabad_triangulated_rupture.png)
 
 ---
 
